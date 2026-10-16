@@ -11,7 +11,7 @@ import cv2
 
 try:
     import sounddevice as sd
-except Exception:  # الصوت اختياري
+except Exception: 
     sd = None
 
 try:
@@ -27,16 +27,14 @@ from PySide6.QtWidgets import (
     QGraphicsDropShadowEffect, QSizePolicy
 )
 
-# ----------------------------------------------------------------------------
-# الإعدادات العامة (قابلة للتعديل بسهولة)
-# ----------------------------------------------------------------------------
+
 APP_TITLE = "مرآة الأكاذيب الذكية"
-ROUNDS = 5                      # عدد الأسئلة لكل زائر
-SCAN_SECONDS = 4                # مدة فحص الكاميرا لكل جولة
-ROUND_ANALYSIS_SECONDS = 2.0    # شاشة التحليل القصيرة بعد كل جولة
-FINAL_ANALYSIS_SECONDS = 5.0    # شاشة التحليل الطويلة قبل النتيجة النهائية
-AUTO_RESET_SECONDS = 30         # العودة التلقائية للشاشة الرئيسية بعد النتيجة
-MIN_FACE_COVERAGE = 0.5         # أقل نسبة إطارات يجب أن يظهر فيها الوجه
+ROUNDS = 5                      
+SCAN_SECONDS = 4               
+ROUND_ANALYSIS_SECONDS = 2.0    
+FINAL_ANALYSIS_SECONDS = 5.0    
+AUTO_RESET_SECONDS = 30        
+MIN_FACE_COVERAGE = 0.5        
 
 QUESTIONS = [
     "عمرك قلت انك بالطريق وانت بعدك ع التخت ",
@@ -107,21 +105,7 @@ C_TRUTH = "#1de9d6"
 C_MID = "#f5c242"
 C_LIE = "#ff3d6e"
 
-# ----------------------------------------------------------------------------
-# خوارزمية الحركة والتباين (Movement Variance & Delta)
-# ----------------------------------------------------------------------------
-# المبدأ:
-#   1) أول إطار يُلتقط في الفحص = الإحداثيات المرجعية (Baseline) لنقاط الشفاه
-#      والعينين والأنف والحاجبين (+ موضع الرأس).
-#   2) لكل إطار نحسب الفرق المطلق بين النقاط وبين الإطار السابق (السرعة)،
-#      وبينها وبين الـ Baseline (الانحراف)، والانحراف المعياري لكل نقطة عبر الزمن.
-#   3) تُدمج الثلاثة في رقم واحد "نسبة النشاط" (1.0 = حركة طبيعية). النسبة تبتعد
-#      عن 1.0 في اتجاهين:  جمود تام  <-- أو -->  حركة مفرطة / متقلبة،
-#      وكلما زاد البعد ارتفع مؤشر التوتر (حتى 97%).
-#
-# معايرة: القيم المرجعية أدناه افتراضية فقط. في مكان العرض قف أمام الكاميرا واضغط C
-# ثم تحدّث بشكل طبيعي 4 ثوانٍ؛ تُحفظ حركتك الطبيعية كمرجع (calibration.json).
-# اضغط D لرؤية القيم الحية.
+
 KEY_GROUPS = {
     "lips": (61, 291, 13, 14, 0, 17, 78, 308, 82, 312),
     "eyes": (33, 133, 159, 145, 153, 160, 158, 144, 362, 263, 386, 374, 380, 385, 387, 373),
@@ -134,22 +118,22 @@ _FEATURE_W = [1.5] * len(KEY_GROUPS["lips"]) + [1.5] * len(KEY_GROUPS["eyes"]) +
 HEAD_SHARE = 0.35  # حصة حركة الرأس من الوزن الكلي (وإلا تذوب نقطة واحدة بين عشرات النقاط)
 KEY_W = np.array(_FEATURE_W + [sum(_FEATURE_W) * HEAD_SHARE / (1 - HEAD_SHARE)], dtype=np.float32)
 
-REF_SPEED = 0.30   # متوسط |الفرق| بين إطارين متتاليين (وحدة: عرض ما بين العينين / ثانية)
-REF_STD = 0.040    # الانحراف المعياري لحركة النقاط خلال الفحص
-REF_DISP = 0.060   # متوسط الانحراف عن الـ Baseline
-MIX = (0.45, 0.35, 0.20)   # أوزان (السرعة، الانحراف المعياري، الانحراف عن الـ Baseline)
-FROZEN_STRETCH = 1.2       # أكبر = تسامح أكثر مع الثبات (أصغر = الجمود يرفع النسبة أسرع)
+REF_SPEED = 0.30  
+REF_STD = 0.040    
+REF_DISP = 0.060   
+MIX = (0.45, 0.35, 0.20)  
+FROZEN_STRETCH = 1.2      
 PCT_FLOOR = 8
 PCT_CEIL = 97
 
 
-# --- تحليل الصوت: القيم المرجعية الافتراضية (تُستبدل بالمعايرة) ---
+
 VOICE_SR = 16000
-REF_V_PITCH = 2.0    # الانحراف المعياري لطبقة الصوت (بالنصف-تون) في الكلام الطبيعي
-REF_V_CV = 0.60      # تذبذب شدة الصوت (الانحراف المعياري / المتوسط)
-REF_V_PAUSE = 0.20   # نسبة الوقفات داخل الإجابة
-V_MIX = (0.45, 0.30, 0.25)   # أوزان (النبرة، شدة الصوت، الوقفات)
-FACE_W, VOICE_W = 0.6, 0.4   # وزن الوجه والصوت في المؤشر النهائي
+REF_V_PITCH = 2.0    
+REF_V_CV = 0.60      
+REF_V_PAUSE = 0.20  
+V_MIX = (0.45, 0.30, 0.25)   
+FACE_W, VOICE_W = 0.6, 0.4  
 
 CALIB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "calibration.json")
 
@@ -295,7 +279,7 @@ class MotionTracker:
         ipd = float(np.linalg.norm(eye_vec))
         if ipd < 1e-6:
             return None
-        # تنعيم المقياس حتى لا تتحول ضوضاء القياس إلى حركة وهمية
+       
         self._ipd = ipd if self._ipd is None else 0.9 * self._ipd + 0.1 * ipd
         ipd = self._ipd
         roll = (pts[362] + pts[263]) / 2.0 - (pts[33] + pts[133]) / 2.0
@@ -305,8 +289,8 @@ class MotionTracker:
         nose = pts[1]
         if self._origin is None:
             self._origin = nose.copy()
-        feat = ((pts[KEY_IDX] - nose) @ rot.T) / ipd           # ملامح الوجه (بدون حركة الرأس)
-        head = ((nose - self._origin) / ipd)[None, :]           # حركة الرأس نفسها
+        feat = ((pts[KEY_IDX] - nose) @ rot.T) / ipd           
+        head = ((nose - self._origin) / ipd)[None, :]           
         return np.concatenate([feat, head], axis=0).astype(np.float32)
 
     def update(self, pts, t):
@@ -333,13 +317,13 @@ class MotionTracker:
         if self._prev is not None and self._prev.shape == norm.shape:
             dt = t - self._prev_t
             if 0.0 < dt <= 0.25:
-                diff = np.abs(norm - self._prev).mean(axis=1)           # الفرق المطلق
+                diff = np.abs(norm - self._prev).mean(axis=1)          
                 speed = float(np.average(diff, weights=w) / dt)
         if self.recording:
             self.frames += 1
             self.face_frames += 1
             if self.baseline is None:
-                self.baseline = norm.copy()                              # أول إطار = المرجع
+                self.baseline = norm.copy()                             
             self.series.append(norm)
             self.disp.append(float(np.average(np.abs(norm - self.baseline).mean(axis=1), weights=w)))
             if speed is not None:
@@ -354,11 +338,11 @@ class MotionTracker:
         self.recording = False
         if len(self.series) < 10 or len(self.steps) < 5:
             return None
-        arr = np.stack(self.series)                                      # (frames, points, 2)
+        arr = np.stack(self.series)                                      
         w = self._w
         steps = np.asarray(self.steps, dtype=np.float32)
         speed = float(0.5 * steps.mean() + 0.5 * np.percentile(steps, 90))
-        spread = float(np.average(arr.std(axis=0).mean(axis=1), weights=w))   # الانحراف المعياري
+        spread = float(np.average(arr.std(axis=0).mean(axis=1), weights=w))   
         drift = float(np.mean(self.disp))
         ratio = MIX[0] * speed / REF_SPEED + MIX[1] * spread / REF_STD + MIX[2] * drift / REF_DISP
         return {"pct": tension_percentage(ratio), "ratio": ratio, "speed": speed,
@@ -385,9 +369,7 @@ def verdict_for(pct):
     return "أعصابك ولّعت", "حركة ونبرة صوت عند أقصى حد. خذ نفس عميق!", C_LIE, "lie"
 
 
-# ----------------------------------------------------------------------------
-# المؤثرات الصوتية (مولّدة برمجياً، لا حاجة لملفات)
-# ----------------------------------------------------------------------------
+
 SR = 44100
 
 
@@ -451,9 +433,7 @@ class SoundFX:
             pass
 
 
-# ----------------------------------------------------------------------------
-# النافذة الرئيسية
-# ----------------------------------------------------------------------------
+
 class MirrorWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -481,8 +461,8 @@ class MirrorWindow(QMainWindow):
         self._face_cascade = None
         self._init_face_tracker()
 
-        # حالة الجلسة
-        self.state = "idle"   # idle | ready | scan | busy | result
+        
+        self.state = "idle"   
         self.questions = []
         self.round_idx = 0
         self.round_scores = []
@@ -510,7 +490,6 @@ class MirrorWindow(QMainWindow):
         self.start_audio()
         self.show_idle()
 
-    # ------------------------------------------------------------------ UI
     def build_ui(self):
         self.setStyleSheet(f"""
             QMainWindow, QWidget {{ background: {C_BG}; color: #e8f7f5; }}
@@ -924,7 +903,7 @@ class MirrorWindow(QMainWindow):
         pix = QPixmap.fromImage(image).scaled(self.camera_view.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.camera_view.setPixmap(pix)
 
-    # ------------------------------------------------------------ Flow
+   
     def set_status(self, text, color=C_ACCENT):
         self.status.setText(f"الحالة: {text}")
         self.status.setStyleSheet(f"color:{color}; font-weight:700; font-size:14px;")
@@ -1072,7 +1051,6 @@ class MirrorWindow(QMainWindow):
         self.update_pips()
         self.start_analysis(final=len(self.round_scores) >= ROUNDS)
 
-    # --------------------------------------------------- شاشة تحليل البيانات
     def start_analysis(self, final):
         self.an_final = final
         self.an_dur = FINAL_ANALYSIS_SECONDS if final else ROUND_ANALYSIS_SECONDS
@@ -1107,7 +1085,6 @@ class MirrorWindow(QMainWindow):
                 self.round_idx += 1
                 self.show_round()
 
-    # ------------------------------------------------------ النتيجة النهائية
     def show_result(self):
         self.state = "result"
         self.final_pct = final_score(self.round_scores)
@@ -1148,7 +1125,6 @@ class MirrorWindow(QMainWindow):
         else:
             self.rs_auto.setText(f"العودة التلقائية بعد {self.auto_left} ثانية")
 
-    # ------------------------------------------------------------ Keys / Close
     def toggle_fullscreen(self):
         if self.isFullScreen():
             self.showNormal()
